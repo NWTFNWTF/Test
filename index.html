@@ -1,343 +1,79 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Plan2Nav3D – Fallback (no modules)</title>
+  <meta charset="UTF-8">
+  <title>Plan2Nav3D</title>
   <style>
-    html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:#0e0f12;color:#e7eaee}
-    #app{display:grid;grid-template-columns:320px 1fr;height:100vh}
-    #ui{background:#16181d;border-right:1px solid #242832;padding:16px 14px;overflow:auto}
-    #canvas-wrap{position:relative}
-    #c{display:block;width:100%;height:100%}
-    #hud{position:absolute;left:12px;bottom:12px;background:#0f1116aa;border:1px solid #242832;border-radius:10px;color:#e7eaee;padding:10px 12px;backdrop-filter: blur(6px)}
-    .group{margin:14px 0 18px;border:1px solid #242832;border-radius:10px;padding:12px}
-    .pill{background:#0f1116;border:1px solid #242832;border-radius:999px;padding:6px 10px;color:#8a93a5;display:inline-block;margin-right:6px}
-    button{cursor:pointer;border:0;background:#1e232d;color:#e7eaee;border-radius:10px;padding:10px 12px;margin-right:8px}
-    input[type="number"]{width:110px;background:#0f1116;color:#e7eaee;border:1px solid #2a2f3a;border-radius:8px;padding:6px 8px}
-    input[type="file"]{width:100%}
-    .muted{color:#8a93a5}
-    .k{display:inline-block;min-width:18px;text-align:center;border:1px solid #2a2f3a;border-radius:4px;padding:0 4px;margin:0 3px;background:#0f1116}
-    #error{display:none;background:#2b1d1d;border:1px solid #7a3a3a;color:#ffb3b3;padding:10px 12px;border-radius:8px;margin-bottom:12px}
+    body { margin: 0; overflow: hidden; background: #111; color: #ddd; font-family: sans-serif; }
+    #ui {
+      position: absolute;
+      top: 10px; left: 10px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
-<div id="app">
   <div id="ui">
-    <h1>Plan2Nav3D <span class="muted">– Fallback</span></h1>
-    <div id="error"></div>
-
-    <div class="group">
-      <label>Carica planimetria SVG
-        <input id="file" type="file" accept=".svg,image/svg+xml">
-      </label>
-      <div style="margin-top:8px">
-        <button id="demo">Demo</button>
-        <button id="reset">Reset camera</button>
-      </div>
-      <p class="muted" style="margin-top:8px">
-        Convenzioni: <code>&lt;line class="wall" data-thickness="120"&gt;</code>,
-        <code>&lt;line class="door"&gt;</code>, <code>&lt;line class="window"&gt;</code>.
-      </p>
-    </div>
-
-    <div class="group">
-      <label>Unità SVG per metro
-        <input id="unitsPerMeter" type="number" step="1" min="1" value="1000">
-      </label>
-      <label>Altezza pareti (m)
-        <input id="wallH" type="number" step="0.1" min="1" value="2.8">
-      </label>
-      <label>Altezza porta (m)
-        <input id="doorH" type="number" step="0.05" min="1" value="2.1">
-      </label>
-      <label>Quota davanzale (m)
-        <input id="sillH" type="number" step="0.05" min="0" value="0.9">
-      </label>
-      <label>Altezza finestra (m)
-        <input id="winH" type="number" step="0.05" min="0.2" value="1.2">
-      </label>
-    </div>
-
-    <div class="group">
-      <span class="pill">Mouse: ruota</span>
-      <span class="pill">Rotella: zoom</span>
-      <span class="pill">Shift: pan</span>
-    </div>
-    <small class="muted">Versione compatibile GitHub Pages (senza ES modules).</small>
+    <button id="demoBtn">Demo</button>
+    <button id="resetBtn">Reset camera</button>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    // Crea scena
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
 
-  <div id="canvas-wrap">
-    <canvas id="c"></canvas>
-    <div id="hud">
-      <div><b>Stato:</b> <span id="status">Pronto</span></div>
-      <small id="meta"></small>
-    </div>
-  </div>
-</div>
+    // Crea camera
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(3,3,3);
 
-<!-- Three.js UMD + controls (no modules) -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-<script>
-(function(){
-  const showError = (msg)=>{
-    const el = document.getElementById('error');
-    el.textContent = msg;
-    el.style.display = 'block';
-    console.error(msg);
-  };
-
-  if (!window.THREE || !THREE.OrbitControls){
-    showError('Errore nel caricare Three.js o OrbitControls. Riprova (Ctrl/Cmd+F5).');
-  }
-
-  // ---------- DOM ----------
-  const fileEl = document.getElementById('file');
-  const demoBtn = document.getElementById('demo');
-  const resetBtn = document.getElementById('reset');
-  const statusEl = document.getElementById('status');
-  const metaEl = document.getElementById('meta');
-  const unitsEl = document.getElementById('unitsPerMeter');
-  const wallHEl = document.getElementById('wallH');
-  const doorHEl = document.getElementById('doorH');
-  const sillHEl = document.getElementById('sillH');
-  const winHEl  = document.getElementById('winH');
-  const canvas = document.getElementById('c');
-
-  // ---------- Three base ----------
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); // fix DPI
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-  camera.position.set(3,3,3);
-
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true; controls.dampingFactor = 0.08;
-  controls.screenSpacePanning = true; controls.maxPolarAngle = Math.PI*0.49;
-
-  function onResize(){
-    const rect = canvas.parentElement.getBoundingClientRect();
-    const w=rect.width, h=rect.height;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  window.addEventListener('resize', onResize);
-  onResize(); // primo layout
-
-  // Lights + grid
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.9));
-  const dir = new THREE.DirectionalLight(0xffffff, 0.7); dir.position.set(5,8,4); scene.add(dir);
-  const grid = new THREE.GridHelper(100, 100, 0x777777, 0x333333); grid.position.y=0.001; scene.add(grid);
-
-  // ---------- Materials ----------
-  const materials = {
-    wall:  new THREE.MeshStandardMaterial({ color: 0xf3f5f8, metalness:0.0, roughness:0.9 }),
-    floor: new THREE.MeshStandardMaterial({ color: 0x777b84, metalness:0.0, roughness:0.95 }),
-    door:  new THREE.MeshStandardMaterial({ color: 0x7a5a3a, metalness:0.1, roughness:0.8 }),
-    glass: new THREE.MeshPhysicalMaterial({ color:0x99c6ff, metalness:0.0, roughness:0.2, transparent:true, opacity:0.7 })
-  };
-
-  let currentGroup = null;
-  function resetScene(){
-    if (currentGroup) scene.remove(currentGroup);
-    currentGroup = new THREE.Group(); scene.add(currentGroup);
-  }
-
-  // ---------- SVG → plan ----------
-  function svgToPlan(svgText){
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, "image/svg+xml");
-    const lines = Array.from(doc.querySelectorAll('line'));
-    const walls = [], doors=[], wins=[];
-    for (const ln of lines){
-      const cls = (ln.getAttribute('class')||'').trim();
-      const x1 = parseFloat(ln.getAttribute('x1')||'0');
-      const y1 = parseFloat(ln.getAttribute('y1')||'0');
-      const x2 = parseFloat(ln.getAttribute('x2')||'0');
-      const y2 = parseFloat(ln.getAttribute('y2')||'0');
-      const L  = Math.hypot(x2-x1, y2-y1);
-      if (!isFinite(L) || L<=0.0001) continue;
-      if (cls.includes('wall')){
-        const tmm = parseFloat(ln.getAttribute('data-thickness')||'120');
-        walls.push({x1,y1,x2,y2,thicknessMM:tmm});
-      } else if (cls.includes('door')){
-        doors.push({x1,y1,x2,y2,width:L});
-      } else if (cls.includes('window')){
-        wins.push({x1,y1,x2,y2,width:L});
-      }
-    }
-    return { walls, doors, wins };
-  }
-
-  // ---------- Build 3D ----------
-  function build3D(plan, cfg){
-    resetScene();
-
-    // Bounds
-    const pts=[]; plan.walls.forEach(w=>{pts.push([w.x1,w.y1],[w.x2,w.y2])});
-    const S = 1 / cfg.unitsPerMeter;
-    function to3(x,y){ return new THREE.Vector3(x*S, 0, -y*S); }
-
-    if (pts.length){
-      let minX=+Infinity,minY=+Infinity,maxX=-Infinity,maxY=-Infinity;
-      for (const [x,y] of pts){ minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x); maxY=Math.max(maxY,y); }
-      const w=(maxX-minX)*S, d=(maxY-minY)*S;
-      const floor = new THREE.Mesh(new THREE.BoxGeometry(w+0.4, 0.02, d+0.4), materials.floor);
-      const c = to3((minX+maxX)/2,(minY+maxY)/2);
-      floor.position.set(c.x, -0.01, c.z); currentGroup.add(floor);
-    }
-
-    function projectT(ax,ay,bx,by, px,py){
-      const vx=bx-ax, vy=by-ay; const L=Math.hypot(vx,vy)||1;
-      return Math.max(0, Math.min(L, ((px-ax)*vx + (py-ay)*vy)/L ));
-    }
-
-    for (const w of plan.walls){
-      const ax=w.x1, ay=w.y1, bx=w.x2, by=w.y2;
-      const vx=bx-ax, vy=by-ay;
-      const Lsvg=Math.hypot(vx,vy); if (Lsvg<0.0001) continue;
-      const ux=vx/Lsvg, uy=vy/Lsvg;
-
-      // openings along wall
-      const along=[];
-      function consider(open,type){
-        const cx=(open.x1+open.x2)/2, cy=(open.y1+open.y2)/2;
-        const dist=Math.abs((vy)*(cx-ax) - (vx)*(cy-ay))/Lsvg;
-        if (dist<=2.0){ const t=projectT(ax,ay,bx,by,cx,cy); const half=(open.width/2);
-          along.push({type,start:Math.max(0,t-half), end:Math.min(Lsvg,t+half)});
-        }
-      }
-      plan.doors.forEach(d=>consider(d,'door'));
-      plan.wins.forEach(g=>consider(g,'window'));
-      along.sort((a,b)=>a.start-b.start);
-
-      // merge overlaps
-      const merged=[];
-      for (const seg of along){
-        if (!merged.length || seg.start>merged[merged.length-1].end){ merged.push({...seg}); }
-        else { const top=merged[merged.length-1]; top.end=Math.max(top.end,seg.end); if (seg.type==='door') top.type='door'; }
-      }
-
-      const thicknessM = (w.thicknessMM/1000);
-      const wallH = cfg.wallH;
-      const segments=[]; let cursor=0;
-      for (const hole of merged){ if (hole.start>cursor) segments.push([cursor,hole.start]); cursor=hole.end; }
-      if (cursor<Lsvg) segments.push([cursor,Lsvg]);
-
-      function addLongBox(s0,s1,h,y0){
-        const lenSVG=Math.max(0,s1-s0); if (lenSVG<=0.0001) return;
-        const lenM=lenSVG*S; const geom=new THREE.BoxGeometry(lenM,h,thicknessM);
-        const mesh=new THREE.Mesh(geom, materials.wall);
-        const midx=ax+ux*(s0+lenSVG/2), midy=ay+uy*(s0+lenSVG/2);
-        const pos=to3(midx,midy); mesh.position.set(pos.x,y0+h/2,pos.z);
-        const angle=Math.atan2(uy,ux); mesh.rotation.y=-angle; currentGroup.add(mesh);
-      }
-
-      for (const [s0,s1] of segments){ addLongBox(s0,s1,wallH,0); }
-
-      const doorH=cfg.doorH, sillH=cfg.sillH, winH=cfg.winH;
-      for (const hole of merged){
-        const s0=hole.start, s1=hole.end;
-        if (hole.type==='door'){
-          if (doorH<wallH) addLongBox(s0,s1,wallH-doorH,doorH);
-          const lenM=(s1-s0)*S;
-          const leaf=new THREE.Mesh(new THREE.BoxGeometry(lenM,doorH*0.98,Math.max(0.01,thicknessM*0.1)), materials.door);
-          const midx=ax+ux*((s0+s1)/2), midy=ay+uy*((s0+s1)/2);
-          const pos=to3(midx,midy); leaf.position.set(pos.x,doorH/2,pos.z); leaf.rotation.y=-Math.atan2(uy,ux); currentGroup.add(leaf);
-        } else {
-          if (sillH>0) addLongBox(s0,s1,Math.min(sillH,wallH),0);
-          const topY=sillH+winH; if (topY<wallH) addLongBox(s0,s1,wallH-topY,topY);
-          const lenM=(s1-s0)*S;
-          const glass=new THREE.Mesh(new THREE.BoxGeometry(lenM,winH*0.98,Math.max(0.01,thicknessM*0.1)), materials.glass);
-          const midx=ax+ux*((s0+s1)/2), midy=ay+uy*((s0+s1)/2);
-          const pos=to3(midx,midy); glass.position.set(pos.x,sillH+winH/2,pos.z); glass.rotation.y=-Math.atan2(uy,ux); currentGroup.add(glass);
-        }
-      }
-    }
-
-    fitCameraToObject(currentGroup, 1.4);
-    statusEl.textContent='Modello pronto';
-    metaEl.textContent=`Pareti: ${plan.walls.length} · Porte: ${plan.doors.length} · Finestre: ${plan.wins.length}`;
-  }
-
-  function fitCameraToObject(obj, mult){
-    mult = mult || 1.2;
-    const box = new THREE.Box3().setFromObject(obj);
-    const size = new THREE.Vector3(); box.getSize(size);
-    const center = new THREE.Vector3(); box.getCenter(center);
-    const maxDim = Math.max(size.x,size.y,size.z) || 1;
-    const dist = (maxDim / Math.tan(THREE.MathUtils.degToRad(camera.fov*0.5))) * mult;
-    const dir = new THREE.Vector3(1,0.6,1).normalize();
-    const newPos = center.clone().add(dir.multiplyScalar(dist));
-    camera.position.copy(newPos);
-    camera.near = Math.max(0.1, dist/100);
-    camera.far  = dist*10 + maxDim*2;
-    camera.updateProjectionMatrix();
-    controls.target.copy(center); controls.update();
-  }
-
-  function currentConfig(){
-    return {
-      unitsPerMeter: parseFloat(unitsEl.value||'1000'),
-      wallH: parseFloat(wallHEl.value||'2.8'),
-      doorH: parseFloat(doorHEl.value||'2.1'),
-      sillH: parseFloat(sillHEl.value||'0.9'),
-      winH:  parseFloat(winHEl.value||'1.2')
-    };
-  }
-
-  // ---------- Events ----------
-  fileEl.addEventListener('change', async e=>{
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    statusEl.textContent='Caricamento...';
-    const txt = await f.text();
-    try{
-      const plan = svgToPlan(txt);
-      build3D(plan, currentConfig());
-    }catch(err){
-      showError('Errore parsing SVG: ' + err.message);
-      statusEl.textContent='Errore nel parsing SVG';
-    }
-  });
-
-  resetBtn.addEventListener('click', ()=>{
-    if (currentGroup) fitCameraToObject(currentGroup, 1.3);
-  });
-
-  // ---------- Demo ----------
-  const demoSVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7000 5000">\
-  <line class="wall" data-thickness="120" x1="500" y1="500" x2="6500" y2="500" />\
-  <line class="wall" data-thickness="120" x1="6500" y1="500" x2="6500" y2="4500" />\
-  <line class="wall" data-thickness="120" x1="6500" y1="4500" x2="500"  y2="4500" />\
-  <line class="wall" data-thickness="120" x1="500"  y1="4500" x2="500"  y2="500" />\
-  <line class="wall" data-thickness="100" x1="3500" y1="500" x2="3500" y2="4500" />\
-  <line class="door" x1="3500" y1="2500" x2="3500" y2="2700" />\
-  <line class="door" x1="2000" y1="4500" x2="2400" y2="4500" />\
-  <line class="window" x1="5000" y1="500" x2="5600" y2="500" />\
-</svg>';
-
-  document.getElementById('demo').addEventListener('click', ()=>{
-    try{
-      const plan = svgToPlan(demoSVG);
-      build3D(plan, currentConfig());
-    }catch(err){
-      showError('Errore in Demo: '+err.message);
-    }
-  });
-
-  // ---------- Render loop ----------
-  const clock = new THREE.Clock();
-  (function loop(){
+    // Controlli
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0,0,0);
     controls.update();
-    renderer.render(scene, camera);
-    requestAnimationFrame(loop);
-  })();
-})();
-</script>
+
+    // Luce
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5,5,5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // Oggetto demo
+    const geometry = new THREE.BoxGeometry(1,1,1);
+    const material = new THREE.MeshStandardMaterial({color:0x44aa88});
+    const cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Pulsanti
+    document.getElementById("demoBtn").onclick = () => {
+      cube.material.color.set(Math.random()*0xffffff);
+    };
+    document.getElementById("resetBtn").onclick = () => {
+      controls.reset();
+    };
+
+    // Animazione
+    function animate(){
+      requestAnimationFrame(animate);
+      cube.rotation.y += 0.01;
+      renderer.render(scene,camera);
+    }
+    animate();
+  </script>
 </body>
 </html>
